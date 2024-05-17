@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"encoding/json"
 	"fmt"
 	"log"
 	"net"
@@ -49,7 +50,15 @@ func (c *Client) repl() {
 			return
 		}
 
-		if _, err = fmt.Fprintf(c.conn, "%v\n", msg); err != nil {
+		packet, err := json.Marshal(Packet{
+			Type: MESSAGE_DIRECT,
+			Body: msg,
+		})
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		if _, err = c.conn.Write(packet); err != nil {
 			if !ConnClosedErr(err) {
 				log.Fatal(err)
 			}

@@ -1,10 +1,10 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"net"
-	"strings"
 )
 
 type Server struct {
@@ -64,8 +64,11 @@ func (s *Server) handle(conn net.Conn) {
 			break
 		}
 
-		msg := strings.TrimSpace(string(buf[:n]))
-		fmt.Printf("%v: %v\n", addr, msg)
+		packet := Packet{}
+		if err = json.Unmarshal(buf[:n], &packet); err != nil {
+			log.Fatal(err)
+		}
+		fmt.Printf("%v: %v\n", addr, packet.String())
 	}
 
 	fmt.Printf("Client disconnected: %v\n", addr)
