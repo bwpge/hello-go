@@ -45,11 +45,16 @@ func (c *Client) repl() {
 
 		msg = strings.TrimSpace(msg)
 		if msg == "QUIT" {
-			break
+			fmt.Println("Goodbye!")
+			return
 		}
 
-		fmt.Fprintf(c.conn, "%v\n", msg)
+		if _, err = fmt.Fprintf(c.conn, "%v\n", msg); err != nil {
+			if !ConnClosedErr(err) {
+				log.Fatal(err)
+			}
+			fmt.Println("Server disconnected")
+			return
+		}
 	}
-
-	fmt.Println("Goodbye!")
 }

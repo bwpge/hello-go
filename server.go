@@ -55,6 +55,12 @@ func (s *Server) handle(conn net.Conn) {
 	for {
 		n, err := conn.Read(buf)
 		if err != nil {
+			if !ConnClosedErr(err) {
+				log.Fatal(err)
+			}
+			break
+		}
+		if n == 0 {
 			break
 		}
 
