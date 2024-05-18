@@ -1,7 +1,6 @@
 package main
 
 import (
-	"database/sql"
 	"errors"
 	"fmt"
 	"log"
@@ -9,46 +8,54 @@ import (
 	"net"
 	"strings"
 	"time"
+
+	"github.com/fatih/color"
 )
 
 var Unauthorized = errors.New("unauthorized")
 
 var InvalidCredentials = errors.New("invalid username or password")
 
+var NilConnection = errors.New("nil user connection pointer")
+
 type Server struct {
-	port     uint16
-	listener net.Listener
-	clients  map[*net.Conn]struct{}
-	db       *sql.DB
+	port  uint16
+	users map[*User]struct{}
+	db    *Database
 }
 
 func NewServer(port uint16) *Server {
 	return &Server{
-		port:    port,
-		clients: make(map[*net.Conn]struct{}),
-		db:      DbConnect(),
+		port:  port,
+		users: make(map[*User]struct{}),
+	}
+}
+
+func (s *Server) Close() {
+	if s.db != nil {
+		s.db.Close()
 	}
 }
 
 func (s *Server) Run() error {
+	s.db = DbConnect()
+	defer s.Close()
+
 	listener, err := net.Listen("tcp", fmt.Sprintf(":%v", s.port))
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	defer listener.Close()
-	defer s.db.Close()
-
-	s.listener = listener
-	fmt.Printf("Server listening on %v\n", s.listener.Addr().String())
-
-	s.runLoop()
+	s.acceptLoop(listener)
 	return nil
 }
 
-func (s *Server) runLoop() {
+func (s *Server) acceptLoop(listener net.Listener) {
+	defer listener.Close()
+	color.HiBlack("Server listening on %v\n", listener.Addr().String())
+
 	for {
-		conn, err := s.listener.Accept()
+		conn, err := listener.Accept()
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -61,20 +68,16 @@ func (s *Server) handle(conn net.Conn) {
 	defer conn.Close()
 
 	buf := make([]byte, 1024)
-	addr := conn.RemoteAddr().String()
 
-	user, err := s.auth(buf, conn)
+	user, err := s.authUser(buf, conn)
 	if err != nil {
 		SendPacket(conn, ErrorPacket(err.Error()))
 		return
 	}
 
-	name := fmt.Sprintf("%v@%v", user, addr)
-	conn.SetReadDeadline(time.Time{})
-	s.clients[&conn] = struct{}{}
-
-	SendPacket(conn, Packet{Type: SERVER_READY})
-	fmt.Printf("Client connected: %v\n", name)
+	s.users[user] = struct{}{}
+	user.SendPacket(Packet{Type: SERVER_READY})
+	color.HiBlack("Client connected: %v\n", user.DisplayName())
 
 	for {
 		n, p, err := ReadPacket(buf, conn)
@@ -88,52 +91,87 @@ func (s *Server) handle(conn net.Conn) {
 			break
 		}
 
-		fmt.Printf("%v: %v\n", name, p.String())
+		fmt.Printf("%v: %v\n", user.DisplayName(), p.String())
 
 		switch p.Type {
 		case MESSAGE_DIRECT:
-			SendPacket(conn, Packet{Type: SERVER_ACK})
+			user.SendPacket(Packet{Type: SERVER_ACK})
 		case MESSAGE_BROADCAST:
-			SendPacket(conn, Packet{Type: SERVER_ACK})
-			p.Body = fmt.Sprintf("%v: %v", name, p.Body)
+			user.SendPacket(Packet{Type: SERVER_ACK})
+			p.Body = fmt.Sprintf("%v: %v", user.DisplayName(), p.Body)
 			go s.broadcast(p)
 		default:
 		}
 	}
 
-	fmt.Printf("Client disconnected: %v\n", name)
-	delete(s.clients, &conn)
+	color.HiBlack("Client disconnected: %v\n", user.DisplayName())
+	delete(s.users, user)
 }
 
-func (s *Server) auth(buf []byte, conn net.Conn) (string, error) {
+func (s *Server) authUser(buf []byte, conn net.Conn) (*User, error) {
 	// client should open the connection with an auth packet, so reject if not ready
+	defer conn.SetReadDeadline(time.Time{})
 	conn.SetReadDeadline(time.Now().Add(time.Second))
 	_, packet, err := ReadPacket(buf, conn)
+
 	addr := conn.RemoteAddr().String()
 
 	if err != nil || packet.Type != CLIENT_AUTH {
-		fmt.Printf("REJECT unauthorized (%v)\n", addr)
-		return "", Unauthorized
+		color.Red("REJECT unauthorized (%v)\n", addr)
+		return nil, Unauthorized
 	}
 
 	if packet.Body == "guest:" {
-		user := fmt.Sprintf("guest%v", rand.Uint32N(99999))
-		fmt.Printf("ACCEPT guest user `%v` (%v)\n", user, addr)
-		return user, nil
+		name := fmt.Sprintf("guest%v", 10000+rand.Uint32N(89999))
+		color.Green("ACCEPT guest user `%v` (%v)\n", name, addr)
+		return NewUser(conn, name), nil
 	}
 
-	user, pass, _ := strings.Cut(packet.Body, ":")
-	if !AuthUser(s.db, user, pass) {
-		fmt.Printf("REJECT invalid credentials (%v)\n", addr)
-		return "", InvalidCredentials
+	name, pass, _ := strings.Cut(packet.Body, ":")
+	if !s.db.AuthUser(name, pass) {
+		color.Red("REJECT invalid credentials (%v)\n", addr)
+		return nil, InvalidCredentials
 	}
-	fmt.Printf("ACCEPT authenticated user `%v` (%v)\n", user, addr)
+	color.Green("ACCEPT authenticated user `%v` (%v)\n", name, addr)
 
-	return user, nil
+	return NewUser(conn, name), nil
 }
 
 func (s *Server) broadcast(p Packet) {
-	for client := range s.clients {
-		SendPacket(*client, p)
+	for user := range s.users {
+		user.SendPacket(p)
 	}
+}
+
+type User struct {
+	conn net.Conn
+	name string
+}
+
+func NewUser(conn net.Conn, name string) *User {
+	return &User{
+		conn: conn,
+		name: name,
+	}
+}
+
+func (u *User) DisplayName() string {
+	return fmt.Sprintf("%s@%s", u.name, u.conn.RemoteAddr().String())
+}
+
+func (u *User) SendPacket(p Packet) error {
+	if u.conn == nil {
+		return NilConnection
+	}
+
+	SendPacket(u.conn, p)
+	return nil
+}
+
+func (u *User) ReadPacket(buf []byte) (int, Packet, error) {
+	if u.conn == nil {
+		return 0, Packet{}, NilConnection
+	}
+
+	return ReadPacket(buf, u.conn)
 }

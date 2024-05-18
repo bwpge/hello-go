@@ -8,7 +8,11 @@ import (
 	"net"
 	"os"
 	"strings"
+
+	"github.com/fatih/color"
 )
+
+var BroadcastColor = color.New(color.FgMagenta).Add(color.Bold)
 
 type Client struct {
 	port uint16
@@ -35,7 +39,7 @@ func (c *Client) Run(user string, pass string) {
 
 	defer conn.Close()
 	c.conn = conn
-	fmt.Printf("Connected to %v\n", conn.RemoteAddr().String())
+	color.HiBlack("Connected to %v\n", conn.RemoteAddr().String())
 	SendPacket(conn, Packet{
 		Type: CLIENT_AUTH,
 		Body: fmt.Sprintf("%v:%v", user, pass),
@@ -111,14 +115,14 @@ func (c *Client) msgLoop() {
 			switch p.Type {
 			case SERVER_ACK:
 			case SERVER_READY:
-				fmt.Println("SERVER READY")
+				color.Green("SERVER READY")
 			case MESSAGE_BROADCAST:
-				fmt.Printf("BROADCAST> %v\n", p.Body)
+				BroadcastColor.Printf("%v\n", p.Body)
 			case ERROR:
-				fmt.Printf("ERROR: %v\n", p.Error())
+				color.Red("ERROR: %v\n", p.Error())
 				return
 			default:
-				fmt.Printf("SERVER: %v\n", p.String())
+				color.Cyan("%v\n", p.String())
 			}
 		case <-c.quit:
 			return

@@ -9,7 +9,7 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
-const DB_NAME = "db.sqlite"
+const DB_CONNECTION_STR = "db.sqlite"
 
 const AUTH_USER_STMT = `
 SELECT username FROM users WHERE
@@ -18,9 +18,13 @@ SELECT username FROM users WHERE
 //go:embed sql/*.sql
 var scripts embed.FS
 
+type Database struct {
+	db *sql.DB
+}
+
 func CreateDb() {
 	os.Remove("./foo.db")
-	db, err := sql.Open("sqlite3", DB_NAME)
+	db, err := sql.Open("sqlite3", DB_CONNECTION_STR)
 	if err != nil {
 		panic(err)
 	}
@@ -52,17 +56,23 @@ func CreateDb() {
 	db.Close()
 }
 
-func DbConnect() *sql.DB {
-	db, err := sql.Open("sqlite3", DB_NAME)
+func DbConnect() *Database {
+	db, err := sql.Open("sqlite3", DB_CONNECTION_STR)
 	if err != nil {
 		panic(err)
 	}
 
-	return db
+	return &Database{db: db}
 }
 
-func AuthUser(db *sql.DB, user string, pass string) bool {
-	stmt, err := db.Prepare(AUTH_USER_STMT)
+func (d *Database) Close() {
+	if d.db != nil {
+		d.db.Close()
+	}
+}
+
+func (d *Database) AuthUser(user string, pass string) bool {
+	stmt, err := d.db.Prepare(AUTH_USER_STMT)
 	if err != nil {
 		panic(err)
 	}
