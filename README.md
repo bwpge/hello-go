@@ -66,12 +66,15 @@ Goodbye!
 The following are some goals to learn more about Go:
 
 - [ ] Client features
-    - [ ] Username and authentication
+    - [x] Username and authentication
     - [x] Broadcast or direct messaging
+    - [ ] Slash commands (`/join`, `/leave`, etc.)
+    - [ ] Direct messaging to peers
 - [ ] Server features
-    - [ ] Database connections for user data
+    - [x] Database connections for user data
     - [x] Client connection map
     - [ ] Message history (ring buffer, database, etc.)
+    - [ ] Server channels/rooms
     - [ ] Implement REST API (e.g., CRUD operations for users, server status, etc.)
 - [ ] Language features
     - [ ] Unit tests

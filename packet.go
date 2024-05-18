@@ -10,12 +10,12 @@ import (
 type PacketType int
 
 const (
-	SERVER_READY      = iota
-	SERVER_ACK        = iota
-	NEED_USERNAME     = iota
-	NEED_PASSWORD     = iota
-	MESSAGE_DIRECT    = iota
+	_                 = iota
+	CLIENT_AUTH       = iota
 	MESSAGE_BROADCAST = iota
+	MESSAGE_DIRECT    = iota
+	SERVER_ACK        = iota
+	SERVER_READY      = iota
 	ERROR             = iota
 )
 
@@ -67,5 +67,12 @@ func SendPacket(w io.Writer, a any) {
 
 	if _, err = w.Write(data); err != nil {
 		panic(err)
+	}
+}
+
+func ErrorPacket(body string) Packet {
+	return Packet{
+		Type: ERROR,
+		Body: body,
 	}
 }

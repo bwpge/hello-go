@@ -27,7 +27,7 @@ func NewClient(port uint16) *Client {
 	}
 }
 
-func (c *Client) Run() {
+func (c *Client) Run(user string, pass string) {
 	conn, err := net.Dial("tcp", fmt.Sprintf(":%v", c.port))
 	if err != nil {
 		log.Fatal(err)
@@ -36,6 +36,10 @@ func (c *Client) Run() {
 	defer conn.Close()
 	c.conn = conn
 	fmt.Printf("Connected to %v\n", conn.RemoteAddr().String())
+	SendPacket(conn, Packet{
+		Type: CLIENT_AUTH,
+		Body: fmt.Sprintf("%v:%v", user, pass),
+	})
 
 	go c.recv()
 	go c.repl()
@@ -61,7 +65,6 @@ func (c *Client) recv() {
 }
 
 func (c *Client) repl() {
-	fmt.Println("Waiting for input, use `QUIT` to exit")
 	reader := bufio.NewReader(os.Stdin)
 
 	for {
@@ -106,11 +109,14 @@ func (c *Client) msgLoop() {
 			}
 		case p := <-c.rx:
 			switch p.Type {
+			case SERVER_ACK:
 			case SERVER_READY:
 				fmt.Println("SERVER READY")
-			case SERVER_ACK:
 			case MESSAGE_BROADCAST:
-				fmt.Printf("SERVER BROADCAST: %v\n", p.Body)
+				fmt.Printf("BROADCAST> %v\n", p.Body)
+			case ERROR:
+				fmt.Printf("ERROR: %v\n", p.Error())
+				return
 			default:
 				fmt.Printf("SERVER: %v\n", p.String())
 			}
