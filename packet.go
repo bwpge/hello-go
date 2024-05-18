@@ -14,6 +14,7 @@ const (
 	CLIENT_AUTH       = iota
 	MESSAGE_BROADCAST = iota
 	MESSAGE_DIRECT    = iota
+	NOT_ALLOWED       = iota
 	SERVER_ACK        = iota
 	SERVER_READY      = iota
 	ERROR             = iota
@@ -67,6 +68,13 @@ func SendPacket(w io.Writer, a any) {
 
 	if _, err = w.Write(data); err != nil {
 		panic(err)
+	}
+}
+
+func NotAllowedPacket(body string) Packet {
+	return Packet{
+		Type: NOT_ALLOWED,
+		Body: body,
 	}
 }
 

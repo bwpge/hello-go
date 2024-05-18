@@ -118,6 +118,8 @@ func (c *Client) msgLoop() {
 				color.Green("SERVER READY")
 			case MESSAGE_BROADCAST:
 				BroadcastColor.Printf("%v\n", p.Body)
+			case NOT_ALLOWED:
+				color.Yellow("SERVER: %v\n", p.Body)
 			case ERROR:
 				color.Red("ERROR: %v\n", p.Error())
 				return

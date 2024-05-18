@@ -95,8 +95,17 @@ func (s *Server) handle(conn net.Conn) {
 
 		switch p.Type {
 		case MESSAGE_DIRECT:
+			if user.isGuest {
+				user.SendPacket(NotAllowedPacket("guests are not allowed to send direct messages"))
+				continue
+			}
 			user.SendPacket(Packet{Type: SERVER_ACK})
 		case MESSAGE_BROADCAST:
+			if user.isGuest {
+				user.SendPacket(NotAllowedPacket("guests are not allowed to send broadcast messages"))
+				continue
+			}
+
 			user.SendPacket(Packet{Type: SERVER_ACK})
 			p.Body = fmt.Sprintf("%v: %v", user.DisplayName(), p.Body)
 			go s.broadcast(p)
@@ -144,14 +153,16 @@ func (s *Server) broadcast(p Packet) {
 }
 
 type User struct {
-	conn net.Conn
-	name string
+	conn    net.Conn
+	name    string
+	isGuest bool
 }
 
 func NewUser(conn net.Conn, name string) *User {
 	return &User{
-		conn: conn,
-		name: name,
+		conn:    conn,
+		name:    name,
+		isGuest: strings.HasPrefix(name, "guest"),
 	}
 }
 
