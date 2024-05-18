@@ -1,11 +1,17 @@
 package main
 
-import "fmt"
+import (
+	"encoding/json"
+	"fmt"
+	"io"
+	"log"
+)
 
 type PacketType int
 
 const (
-	READY             = iota
+	SERVER_READY      = iota
+	SERVER_ACK        = iota
 	NEED_USERNAME     = iota
 	NEED_PASSWORD     = iota
 	MESSAGE_DIRECT    = iota
@@ -35,4 +41,31 @@ func (p *Packet) Error() string {
 	}
 
 	return p.Body
+}
+
+func ReadPacket(buf []byte, r io.Reader) (int, Packet, error) {
+	n, err := r.Read(buf)
+	if err != nil {
+	}
+	if n == 0 {
+		return n, Packet{}, nil
+	}
+
+	packet := Packet{}
+	if err = json.Unmarshal(buf[:n], &packet); err != nil {
+		log.Fatal(err)
+	}
+
+	return n, packet, nil
+}
+
+func SendPacket(w io.Writer, a any) {
+	data, err := json.Marshal(a)
+	if err != nil {
+		panic(err)
+	}
+
+	if _, err = w.Write(data); err != nil {
+		panic(err)
+	}
 }

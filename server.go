@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"log"
 	"net"
@@ -10,11 +9,13 @@ import (
 type Server struct {
 	port     uint16
 	listener net.Listener
+	clients  map[*net.Conn]struct{}
 }
 
 func NewServer(port uint16) *Server {
 	return &Server{
-		port: port,
+		port:    port,
+		clients: make(map[*net.Conn]struct{}),
 	}
 }
 
@@ -48,15 +49,18 @@ func (s *Server) runLoop() {
 func (s *Server) handle(conn net.Conn) {
 	defer conn.Close()
 
-	addr := conn.RemoteAddr().String()
-	fmt.Printf("Client connected: %v\n", addr)
 	buf := make([]byte, 1024)
+	addr := conn.RemoteAddr().String()
+	s.clients[&conn] = struct{}{}
+
+	SendPacket(conn, Packet{Type: SERVER_READY})
+	fmt.Printf("Client connected: %v\n", addr)
 
 	for {
-		n, err := conn.Read(buf)
+		n, p, err := ReadPacket(buf, conn)
 		if err != nil {
 			if !ConnClosedErr(err) {
-				log.Fatal(err)
+				panic(err)
 			}
 			break
 		}
@@ -64,12 +68,28 @@ func (s *Server) handle(conn net.Conn) {
 			break
 		}
 
-		packet := Packet{}
-		if err = json.Unmarshal(buf[:n], &packet); err != nil {
-			log.Fatal(err)
+		fmt.Printf("%v: %v\n", addr, p.String())
+
+		switch p.Type {
+		case MESSAGE_DIRECT:
+			SendPacket(conn, Packet{Type: SERVER_ACK})
+		case MESSAGE_BROADCAST:
+			SendPacket(conn, Packet{Type: SERVER_ACK})
+			go s.broadcast(p)
+		default:
+			SendPacket(conn, Packet{
+				Type: ERROR,
+				Body: "invalid packet type",
+			})
 		}
-		fmt.Printf("%v: %v\n", addr, packet.String())
 	}
 
 	fmt.Printf("Client disconnected: %v\n", addr)
+	delete(s.clients, &conn)
+}
+
+func (s *Server) broadcast(p Packet) {
+	for client := range s.clients {
+		SendPacket(*client, p)
+	}
 }
