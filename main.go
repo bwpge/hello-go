@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"log"
@@ -10,6 +11,18 @@ import (
 )
 
 func main() {
+	userPassFlags := []cli.Flag{
+		&cli.StringFlag{
+			Name:    "username",
+			Usage:   "`USERNAME` to connect with",
+			Aliases: []string{"u"},
+		},
+		&cli.StringFlag{
+			Name:    "password",
+			Usage:   "`PASSWORD` for the account",
+			Aliases: []string{"p"},
+		},
+	}
 	app := &cli.App{
 		Name:  "hello-go",
 		Usage: "a basic client-server application",
@@ -39,38 +52,66 @@ func main() {
 			{
 				Name:  "client",
 				Usage: "Start a client",
-				Flags: []cli.Flag{
-					&cli.StringFlag{
-						Name:    "username",
-						Usage:   "`USERNAME` to connect with",
-						Aliases: []string{"u"},
-						Value:   "guest",
-					},
-					&cli.StringFlag{
-						Name:    "password",
-						Usage:   "`PASSWORD` for the account",
-						Aliases: []string{"p"},
-					},
-				},
+				Flags: userPassFlags,
 				Action: func(ctx *cli.Context) error {
-					NewClient(uint16(ctx.Uint("port"))).Run(ctx.String("username"), ctx.String("password"))
+					user := ctx.String("username")
+					if user == "" {
+						user = "guest"
+					}
+					NewClient(uint16(ctx.Uint("port"))).Run(user, ctx.String("password"))
 					return nil
 				},
 			},
 			{
-				Name:    "database",
-				Usage:   "manage the application database",
+				Name:    "register",
+				Usage:   "Create a new user in the database",
+				Flags:   userPassFlags,
+				Aliases: []string{"r"},
+				Action: func(ctx *cli.Context) error {
+					user := ctx.String("username")
+					if user == "" {
+						return errors.New("username must not be empty")
+					}
+					if user == "guest" {
+						return errors.New("`guest` is a reserved name and cannot be used")
+					}
+
+					pass := ctx.String("password")
+					if pass == "" {
+						return errors.New("password must not be empty")
+					}
+
+					db := DbConnect()
+					return db.CreateUser(user, pass)
+				},
+			},
+			{
+				Name:    "gen-database",
+				Usage:   "Create a new database (deletes existing one)",
 				Aliases: []string{"db"},
-				Subcommands: []*cli.Command{
-					{
-						Name:  "create",
-						Usage: "Create a new database (deletes existing one)",
-						Action: func(ctx *cli.Context) error {
-							CreateDb()
-							fmt.Println("Database created!")
-							return nil
-						},
-					},
+				Action: func(ctx *cli.Context) error {
+					CreateDb()
+					fmt.Println("Database created!")
+					return nil
+				},
+			},
+			{
+				Name:    "gen-password",
+				Usage:   "Create salt and hash values for passwords",
+				Aliases: []string{"pw"},
+				Args:    true,
+				Action: func(ctx *cli.Context) error {
+					value := ctx.Args().First()
+					if value == "" {
+						return errors.New("password must not be empty")
+					}
+
+					salt := hex.EncodeToString(GenerateSalt())
+					hash := HashPassword(value, salt)
+
+					fmt.Printf("SALT: %v\nHASH: %v\n", salt, hash)
+
+					return nil
 				},
 			},
 		},

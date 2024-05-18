@@ -3,17 +3,20 @@ package main
 import (
 	"database/sql"
 	"embed"
+	"encoding/hex"
+	"fmt"
 	"io/fs"
 	"os"
 
+	"github.com/fatih/color"
 	_ "github.com/mattn/go-sqlite3"
 )
 
 const DB_CONNECTION_STR = "db.sqlite"
 
-const AUTH_USER_STMT = `
-SELECT username FROM users WHERE
-    username = ? AND password = ?;`
+const AUTH_STMT = `SELECT salt, hash FROM users WHERE username = ? LIMIT 1`
+
+const CREATE_USER_STMT = `INSERT INTO users VALUES (?, ?, ?)`
 
 //go:embed sql/*.sql
 var scripts embed.FS
@@ -29,6 +32,7 @@ func CreateDb() {
 		panic(err)
 	}
 
+	// execute migration scripts
 	err = fs.WalkDir(scripts, ".", func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -71,20 +75,38 @@ func (d *Database) Close() {
 	}
 }
 
+func (d *Database) CreateUser(user string, pass string) error {
+	fmt.Printf("Creating user `%s`", user)
+	stmt, err := d.db.Prepare(CREATE_USER_STMT)
+	if err != nil {
+		return err
+	}
+
+	salt := hex.EncodeToString(GenerateSalt())
+	hash := HashPassword(pass, salt)
+
+	_, err = stmt.Exec(user, salt, hash)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (d *Database) AuthUser(user string, pass string) bool {
-	stmt, err := d.db.Prepare(AUTH_USER_STMT)
+	color.HiBlack("Authenticating user `%s`", user)
+
+	stmt, err := d.db.Prepare(AUTH_STMT)
 	if err != nil {
 		panic(err)
 	}
 
-	var result string
-	err = stmt.QueryRow(user, pass).Scan(&result)
-	if err == sql.ErrNoRows {
+	var salt string
+	var hash string
+	err = stmt.QueryRow(user).Scan(&salt, &hash)
+	if err != nil {
 		return false
 	}
-	if err != nil {
-		panic(err)
-	}
 
-	return result == user
+	return HashPassword(pass, salt) == hash
 }
