@@ -25,7 +25,6 @@ GLOBAL OPTIONS:
    --help, -h   show help
 ```
 
-
 ### Server
 
 Start a server with (example to change default port):
@@ -76,21 +75,30 @@ To authenticate, use `-u` and `-p` to provide a username and password.
 The following are some goals to learn more about Go:
 
 - [ ] Client features
-    - [x] Username and authentication
     - [x] Broadcast messages (`!message`)
     - [ ] Slash commands (`/list`, `/join`, `/leave`, etc.)
     - [ ] Direct messages to peers or channels/rooms
 - [ ] Server features
-    - [x] Database connections for user data
+    - [x] Database connections
     - [x] Client connection map
+    - [x] Permissions for authenticated users vs. guests
     - [ ] Server channels/rooms
-    - [ ] Permissions for authenticated users vs. guests
-    - [ ] Message history (ring buffer, database, etc.)
-    - [ ] Implement REST API (e.g., CRUD operations for users, server status, etc.)
+- [ ] Application features
+    - [x] User authentication
+    - [ ] Websockets API
+    - [ ] REST API
 - [ ] Language/misc features
-    - [x] Structured messages (JSON, binary encoding/decoding, etc.)
-    - [x] Channels for message passing
-    - [ ] Color output
-    - [ ] Interfaces for different types of databases
     - [ ] Buffered streams for reading long messages
+    - [x] Structured messages (JSON, binary encoding/decoding, etc.)
+    - [ ] Parsing/routing different message types (e.g., tagged union with `json.RawMessage`)
+    - [x] Channels for message passing
+    - [x] Password hashing
+    - [ ] Interfaces for various items (messages, database connections, etc.)
+    - [x] Color output
     - [ ] Unit tests
+
+References:
+
+- [Anthony GG | How To Build A Custom TCP Server In Golang?](https://www.youtube.com/watch?v=qJQrrscB1-4)
+- [david hwang | Go Realtime Chat Part 1](https://www.youtube.com/watch?v=W9SuX9c40s8)
+- [ProgrammingPercy | Mastering WebSockets With Go](https://www.youtube.com/watch?v=pKpKv9MKN-E)
