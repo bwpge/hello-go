@@ -67,15 +67,15 @@ The following are some goals to learn more about Go:
 
 - [ ] Client features
     - [ ] Username and authentication
-    - [ ] Broadcast or direct messaging
+    - [x] Broadcast or direct messaging
 - [ ] Server features
     - [ ] Database connections for user data
-    - [ ] Client connection map
+    - [x] Client connection map
     - [ ] Message history (ring buffer, database, etc.)
     - [ ] Implement REST API (e.g., CRUD operations for users, server status, etc.)
 - [ ] Language features
     - [ ] Unit tests
-    - [ ] Structured messages (gRPC, JSON, etc.)
+    - [x] Structured messages (JSON, binary encoding/decoding, etc.)
     - [ ] Interfaces for different types of databases
-    - [ ] Channels for message passing
+    - [x] Channels for message passing
     - [ ] Buffered streams for reading long messages
