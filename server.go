@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"fmt"
+	"hello-go/common"
 	"log"
 	"math/rand/v2"
 	"net"
@@ -21,7 +22,7 @@ var NilConnection = errors.New("nil user connection pointer")
 type Server struct {
 	port  uint16
 	users map[*User]struct{}
-	db    *Database
+	db    *common.Database
 }
 
 func NewServer(port uint16) *Server {
@@ -38,7 +39,7 @@ func (s *Server) Close() {
 }
 
 func (s *Server) Run() error {
-	s.db = DbConnect()
+	s.db = common.DbConnect()
 	defer s.Close()
 
 	listener, err := net.Listen("tcp", fmt.Sprintf(":%v", s.port))
@@ -82,7 +83,7 @@ func (s *Server) handle(conn net.Conn) {
 	for {
 		n, p, err := ReadPacket(buf, conn)
 		if err != nil {
-			if !ConnClosedErr(err) {
+			if !common.IsConnClosedErr(err) {
 				panic(err)
 			}
 			break

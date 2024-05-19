@@ -1,16 +1,28 @@
 package main
 
 import (
-	"encoding/hex"
+	"embed"
 	"errors"
 	"fmt"
-	"log"
+	"hello-go/client"
+	"hello-go/common"
+	"hello-go/server"
 	"os"
 
+	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/log"
 	"github.com/urfave/cli/v2"
 )
 
+//go:embed sql/*.sql
+var migrations embed.FS
+
 func main() {
+	setupLogging()
+
+	// see: https://stackoverflow.com/a/67357103
+	common.Migrations = migrations
+
 	userPassFlags := []cli.Flag{
 		&cli.StringFlag{
 			Name:    "username",
@@ -41,24 +53,27 @@ func main() {
 		},
 		Commands: []*cli.Command{
 			{
-				Name:  "server",
-				Usage: "Start a server",
+				Name:    "server",
+				Usage:   "Start a server",
+				Aliases: []string{"s"},
 				Action: func(ctx *cli.Context) error {
-					s := NewServer(uint16(ctx.Uint("port")))
+					s := server.New(uint16(ctx.Uint("port")))
 					log.Fatal(s.Run())
 					return nil
 				},
 			},
 			{
-				Name:  "client",
-				Usage: "Start a client",
-				Flags: userPassFlags,
+				Name:    "client",
+				Usage:   "Start a client",
+				Aliases: []string{"c"},
+				Flags:   userPassFlags,
 				Action: func(ctx *cli.Context) error {
 					user := ctx.String("username")
 					if user == "" {
 						user = "guest"
 					}
-					NewClient(uint16(ctx.Uint("port"))).Run(user, ctx.String("password"))
+					c := client.New(uint16(ctx.Uint("port")))
+					c.Run(user, ctx.String("password"))
 					return nil
 				},
 			},
@@ -81,17 +96,16 @@ func main() {
 						return errors.New("password must not be empty")
 					}
 
-					db := DbConnect()
+					db := common.DbConnect()
 					return db.CreateUser(user, pass)
 				},
 			},
 			{
 				Name:    "gen-database",
 				Usage:   "Create a new database (deletes existing one)",
-				Aliases: []string{"db"},
+				Aliases: []string{"gendb"},
 				Action: func(ctx *cli.Context) error {
-					CreateDb()
-					fmt.Println("Database created!")
+					common.CreateDb()
 					return nil
 				},
 			},
@@ -106,10 +120,8 @@ func main() {
 						return errors.New("password must not be empty")
 					}
 
-					salt := hex.EncodeToString(GenerateSalt())
-					hash := HashPassword(value, salt)
-
-					fmt.Printf("SALT: %v\nHASH: %v\n", salt, hash)
+					salt, hash, count := common.GenCreds(value)
+					fmt.Printf("SALT:  %v\nHASH:  %v\nCOUNT: %v\n", salt, hash, count)
 
 					return nil
 				},
@@ -120,4 +132,27 @@ func main() {
 	if err := app.Run(os.Args); err != nil {
 		log.Fatal(err)
 	}
+}
+
+func setupLogging() {
+	log.SetLevel(log.DebugLevel)
+	styles := log.DefaultStyles()
+	styles.Levels[log.DebugLevel].
+		Foreground(lipgloss.Color("6")).
+		UnsetMaxWidth()
+	styles.Levels[log.InfoLevel].
+		Foreground(lipgloss.Color("4")).
+		UnsetMaxWidth().Padding(0, 1, 0, 0)
+	styles.Levels[log.WarnLevel].
+		Foreground(lipgloss.Color("3")).
+		UnsetMaxWidth().
+		Padding(0, 1, 0, 0)
+	styles.Levels[log.ErrorLevel].
+		Foreground(lipgloss.Color("1")).
+		UnsetMaxWidth()
+	styles.Levels[log.FatalLevel].
+		Foreground(lipgloss.Color("1")).
+		Reverse(true).
+		UnsetMaxWidth()
+	log.SetStyles(styles)
 }

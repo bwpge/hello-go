@@ -1,39 +1,40 @@
-package main
+package common
 
 import (
 	"database/sql"
 	"embed"
-	"encoding/hex"
 	"fmt"
 	"io/fs"
 	"os"
 
+	"github.com/charmbracelet/log"
 	"github.com/fatih/color"
 	_ "github.com/mattn/go-sqlite3"
 )
 
 const DB_CONNECTION_STR = "db.sqlite"
 
-const AUTH_STMT = `SELECT salt, hash FROM users WHERE username = ? LIMIT 1`
+const AUTH_STMT = `SELECT salt, hash, count FROM users WHERE username = ? LIMIT 1`
 
-const CREATE_USER_STMT = `INSERT INTO users VALUES (?, ?, ?)`
+const CREATE_USER_STMT = `INSERT INTO users VALUES (?, ?, ?, ?)`
 
-//go:embed sql/*.sql
-var scripts embed.FS
+var Migrations embed.FS
 
 type Database struct {
 	db *sql.DB
 }
 
 func CreateDb() {
-	os.Remove("./foo.db")
+	log.Infof("Creating new database `%s`", DB_CONNECTION_STR)
+	os.Remove(DB_CONNECTION_STR)
 	db, err := sql.Open("sqlite3", DB_CONNECTION_STR)
 	if err != nil {
 		panic(err)
 	}
+	defer db.Close()
 
 	// execute migration scripts
-	err = fs.WalkDir(scripts, ".", func(path string, d fs.DirEntry, err error) error {
+	err = fs.WalkDir(Migrations, ".", func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -41,6 +42,7 @@ func CreateDb() {
 			return nil
 		}
 
+		log.Debugf("Executing migration `%s`", path)
 		data, err := os.ReadFile(path)
 		if err != nil {
 			return err
@@ -57,7 +59,7 @@ func CreateDb() {
 		panic(err)
 	}
 
-	db.Close()
+	log.Info("Successfully created database")
 }
 
 func DbConnect() *Database {
@@ -82,10 +84,8 @@ func (d *Database) CreateUser(user string, pass string) error {
 		return err
 	}
 
-	salt := hex.EncodeToString(GenerateSalt())
-	hash := HashPassword(pass, salt)
-
-	_, err = stmt.Exec(user, salt, hash)
+	salt, hash, count := GenCreds(pass)
+	_, err = stmt.Exec(user, salt, hash, count)
 	if err != nil {
 		return err
 	}
@@ -101,12 +101,17 @@ func (d *Database) AuthUser(user string, pass string) bool {
 		panic(err)
 	}
 
-	var salt string
+	var saltStr string
 	var hash string
-	err = stmt.QueryRow(user).Scan(&salt, &hash)
+	var count uint32
+	err = stmt.QueryRow(user).Scan(&saltStr, &hash, &count)
 	if err != nil {
 		return false
 	}
+	salt, err := b64decode(saltStr)
+	if err != nil {
+		panic(err)
+	}
 
-	return HashPassword(pass, salt) == hash
+	return HashPassword(pass, salt, count) == hash
 }

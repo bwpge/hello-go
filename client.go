@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
+	"hello-go/common"
 	"log"
 	"net"
 	"os"
@@ -56,7 +57,7 @@ func (c *Client) recv() {
 	for {
 		n, p, err := ReadPacket(buf, c.conn)
 		if err != nil {
-			if !ConnClosedErr(err) {
+			if !common.IsConnClosedErr(err) {
 				panic(err)
 			}
 			break
@@ -105,7 +106,7 @@ func (c *Client) msgLoop() {
 				panic(err)
 			}
 			if _, err := c.conn.Write(data); err != nil {
-				if !ConnClosedErr(err) {
+				if !common.IsConnClosedErr(err) {
 					panic(err)
 				}
 				fmt.Println("Server disconnected")

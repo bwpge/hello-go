@@ -1,4 +1,4 @@
-package main
+package common
 
 import (
 	"errors"
@@ -8,7 +8,7 @@ import (
 	"syscall"
 )
 
-func ConnClosedErr(err error) bool {
+func IsConnClosedErr(err error) bool {
 	cause := err
 	for {
 		if unwrap, ok := cause.(interface{ Unwrap() error }); ok {
