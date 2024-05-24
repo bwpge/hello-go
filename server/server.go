@@ -5,14 +5,14 @@ import (
 	"fmt"
 	"hello-go/common"
 	"net/http"
-	"strings"
 	"sync"
+	"time"
 
 	"github.com/charmbracelet/log"
 	"github.com/gorilla/websocket"
 )
 
-type PeerMap map[Peer]struct{}
+type PeerMap map[*Peer]struct{}
 
 type WsServer struct {
 	port     uint16
@@ -25,7 +25,8 @@ type WsServer struct {
 func New(port uint16) *WsServer {
 	origins := map[string]struct{}{
 		fmt.Sprintf("http://localhost:%v", port): {},
-		"https://websocketking.com":              {},
+		// used for gui testing
+		"https://websocketking.com": {},
 	}
 
 	return &WsServer{
@@ -47,6 +48,20 @@ func (s *WsServer) Run() error {
 	http.HandleFunc("/", s.index)
 	http.HandleFunc("/ws", s.serveWS)
 	// TODO: implement REST API
+
+	// DEBUG: testing client recv
+	go func() {
+		packet := &common.RawPacket{Type: "heartbeat", Payload: []byte{}}
+
+		for {
+			time.Sleep(time.Second * 5)
+			s.RLock()
+			for p := range s.peers {
+				common.WritePacket(p.conn, packet)
+			}
+			s.RUnlock()
+		}
+	}()
 
 	log.Debugf("server listening on :%v", s.port)
 	return http.ListenAndServe(fmt.Sprintf(":%v", s.port), nil)
@@ -71,17 +86,17 @@ func (s *WsServer) serveWS(w http.ResponseWriter, r *http.Request) {
 	}
 
 	log.Debugf("upgraded to websocket: %v", conn.RemoteAddr())
-	go s.handle(Peer{conn: conn})
+	go s.handle(NewPeer(conn))
 }
 
-func (s *WsServer) add(p Peer) {
+func (s *WsServer) add(p *Peer) {
 	s.Lock()
 	defer s.Unlock()
 
 	s.peers[p] = struct{}{}
 }
 
-func (s *WsServer) remove(p Peer) {
+func (s *WsServer) remove(p *Peer) {
 	s.Lock()
 	defer s.Unlock()
 
@@ -92,25 +107,9 @@ func (s *WsServer) remove(p Peer) {
 	}
 }
 
-func (s *WsServer) handle(p Peer) {
+func (s *WsServer) handle(p *Peer) {
 	s.add(p)
 	defer s.remove(p)
 
-	// TODO: implement read/write channels
-	s.readPackets(p)
-}
-
-func (s *WsServer) readPackets(p Peer) {
-	for {
-		ty, data, err := p.conn.ReadMessage()
-		if err != nil {
-			if websocket.IsUnexpectedCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway) {
-				log.Warnf("unexpected closure: %v", err)
-			}
-			log.Infof("client disconnected: %v", p.Name())
-			break
-		}
-
-		log.Infof("recv: addr=%v, type=%v, data=%v", p.Name(), ty, strings.TrimSpace(string(data)))
-	}
+	p.recv()
 }

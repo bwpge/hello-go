@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"hello-go/common"
+	"io"
 	"net"
 	"os"
 	"strings"
@@ -15,7 +16,7 @@ import (
 type WsClient struct {
 	port uint16
 	conn *websocket.Conn
-	rx   chan *common.Packet
+	rx   chan common.Packet
 	tx   chan common.Packet
 	quit chan struct{}
 }
@@ -23,7 +24,7 @@ type WsClient struct {
 func New(port uint16) *WsClient {
 	return &WsClient{
 		port: port,
-		rx:   make(chan *common.Packet),
+		rx:   make(chan common.Packet),
 		tx:   make(chan common.Packet),
 		quit: make(chan struct{}),
 	}
@@ -65,8 +66,25 @@ func (c *WsClient) Run(user string, pass string) {
 	c.conn = conn
 	fmt.Printf("Connected to %v\n", c.RemoteAddr().String())
 	defer c.Close()
+	go c.recv()
 	go c.repl()
 	c.msgLoop()
+}
+
+func (c *WsClient) recv() {
+	for {
+		p, err := common.ReadPacket(c.conn)
+		if err != nil && err != common.ErrDisconnected {
+			log.Error(err)
+			break
+		}
+		if p == nil {
+			break
+		}
+		c.rx <- p
+	}
+
+	c.quit <- struct{}{}
 }
 
 func (c *WsClient) repl() {
@@ -78,7 +96,11 @@ func (c *WsClient) repl() {
 	for {
 		input, err := reader.ReadString('\n')
 		if err != nil {
-			log.Fatal(err)
+			if err == io.EOF {
+				break
+			} else {
+				log.Fatal(err)
+			}
 		}
 
 		input = strings.TrimSpace(input)
@@ -87,19 +109,23 @@ func (c *WsClient) repl() {
 			break
 		}
 
-		c.tx <- &common.MessagePacket{Data: input}
+		c.tx <- &common.RawPacket{
+			Type:    "text",
+			Payload: []byte(input),
+		}
 	}
 }
 
 func (c *WsClient) msgLoop() {
 	for {
 		select {
+		case <-c.rx:
+			// TODO: handle packet
 		case p := <-c.tx:
-			if err := c.conn.WriteJSON(p.EncodePacket()); err != nil {
-				panic(err)
+			if err := common.WritePacket(c.conn, p); err != nil {
+				log.Error(err)
+				return
 			}
-		case p := <-c.rx:
-			fmt.Printf("recv: %v\n", p)
 		case <-c.quit:
 			log.Debugf("exiting message loop")
 			return
