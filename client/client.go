@@ -2,10 +2,12 @@ package client
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"hello-go/common"
 	"io"
 	"net"
+	"net/http"
 	"os"
 	"strings"
 
@@ -55,8 +57,15 @@ func (c *WsClient) LocalAddr() net.Addr {
 }
 
 func (c *WsClient) Run(user string, pass string) {
+	otp, err := c.authenticate(user, pass)
+	if err != nil {
+		log.Error(err)
+		return
+	}
+	log.Debugf("received OTP from server: %s", otp)
+
 	conn, _, err := websocket.DefaultDialer.Dial(
-		fmt.Sprintf("ws://localhost:%v/ws", c.port),
+		fmt.Sprintf("ws://localhost:%v/ws?otp=%s", c.port, otp),
 		map[string][]string{"Origin": {fmt.Sprintf("http://localhost:%d", c.port)}},
 	)
 	if err != nil {
@@ -64,11 +73,34 @@ func (c *WsClient) Run(user string, pass string) {
 	}
 
 	c.conn = conn
-	fmt.Printf("Connected to %v\n", c.RemoteAddr().String())
+	log.Infof("connected to %v", c.RemoteAddr().String())
 	defer c.Close()
 	go c.recv()
 	go c.repl()
 	c.msgLoop()
+}
+
+func (c *WsClient) authenticate(user string, pass string) (string, error) {
+	log.Debug("requesting OTP from server")
+
+	url := fmt.Sprintf("http://localhost:%d/login", c.port)
+	r, _ := http.NewRequest("GET", url, nil)
+	r.SetBasicAuth(user, pass)
+	client := http.Client{}
+	resp, err := client.Do(r)
+	if err != nil {
+		return "", err
+	}
+	if resp.StatusCode != 200 {
+		return "", errors.New(fmt.Sprintf("server responded with `%s`", resp.Status))
+	}
+
+	otp, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+
+	return string(otp), nil
 }
 
 func (c *WsClient) recv() {
@@ -105,7 +137,7 @@ func (c *WsClient) repl() {
 
 		input = strings.TrimSpace(input)
 		if input == "QUIT" || input == "Q" {
-			fmt.Println("Goodbye!")
+			log.Debugf("exiting REPL")
 			break
 		}
 

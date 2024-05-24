@@ -8,7 +8,6 @@ import (
 	"os"
 
 	"github.com/charmbracelet/log"
-	"github.com/fatih/color"
 	_ "github.com/mattn/go-sqlite3"
 )
 
@@ -25,7 +24,7 @@ type Database struct {
 }
 
 func CreateDb() {
-	log.Infof("Creating new database `%s`", DB_CONNECTION_STR)
+	log.Infof("creating new database `%s`", DB_CONNECTION_STR)
 	os.Remove(DB_CONNECTION_STR)
 	db, err := sql.Open("sqlite3", DB_CONNECTION_STR)
 	if err != nil {
@@ -42,7 +41,7 @@ func CreateDb() {
 			return nil
 		}
 
-		log.Debugf("Executing migration `%s`", path)
+		log.Debugf("executing migration `%s`", path)
 		data, err := os.ReadFile(path)
 		if err != nil {
 			return err
@@ -59,7 +58,7 @@ func CreateDb() {
 		panic(err)
 	}
 
-	log.Info("Successfully created database")
+	log.Info("successfully created database")
 }
 
 func DbConnect() *Database {
@@ -73,6 +72,7 @@ func DbConnect() *Database {
 
 func (d *Database) Close() {
 	if d.db != nil {
+		log.Info("closing database connection")
 		d.db.Close()
 	}
 }
@@ -94,7 +94,7 @@ func (d *Database) CreateUser(user string, pass string) error {
 }
 
 func (d *Database) AuthUser(user string, pass string) bool {
-	color.HiBlack("Authenticating user `%s`", user)
+	log.Debugf("authenticating user `%s`", user)
 
 	stmt, err := d.db.Prepare(AUTH_STMT)
 	if err != nil {
