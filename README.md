@@ -1,11 +1,10 @@
 # hello-go
 
-A very basic server-client application for learning Go.
+A client-server project for me to learn Go.
 
 ## Usage
 
 Running the application with no arguments will display a usage menu:
-
 
 ```
 NAME:
@@ -72,33 +71,36 @@ To authenticate, use `-u` and `-p` to provide a username and password.
 
 ## Learning Roadmap
 
-The following are some goals to learn more about Go:
+The following are some goals to learn more about the language:
 
-- [ ] Client features
-    - [x] Broadcast messages (`!message`)
-    - [ ] Slash commands (`/list`, `/join`, `/leave`, etc.)
-    - [ ] Direct messages to peers or channels/rooms
-- [ ] Server features
-    - [x] Database connections
-    - [x] Client connection map
-    - [x] Permissions for authenticated users vs. guests
-    - [ ] Server channels/rooms
-- [ ] Application features
-    - [x] User authentication
-    - [ ] Websockets API
-    - [ ] REST API
-- [ ] Language/misc features
-    - [ ] Buffered streams for reading long messages
+- [x] Server architecture
+    - [x] Websockets
     - [x] Structured messages (JSON, binary encoding/decoding, etc.)
-    - [ ] Parsing/routing different message types (e.g., tagged union with `json.RawMessage`)
-    - [x] Channels for message passing
-    - [x] Password hashing
-    - [ ] Interfaces for various items (messages, database connections, etc.)
-    - [x] Color output
-    - [ ] Unit tests
+    - [ ] Parsing/routing different message types (e.g., deserialize with type tag and raw bytes)
+    - [x] Heartbeats and other "control" messages
+- [x] Database connections
+- [x] Server connection map (e.g., track open connections for broadcasts)
+- [x] Permissions for authenticated users vs. guests
+- [x] User authentication
+    - [x] Password hashing with random salt and iteration counts
+    - [x] OTPs for websocket upgrades
+- [x] Buffered streams
+- [x] Language features
+    - [x] Channels for concurrent message handling
+    - [x] Interfaces (e.g., packet types)
+    - [x] File embedding
+- [x] Color output
+- [x] Logging
+- [x] REST API (CRUD operations, server status, etc.)
+    - [x] Protect endpoints with middleware
+- [ ] Stress test
+- [ ] Unit tests
+- [x] Organize module with packages
 
 References:
 
-- [Anthony GG | How To Build A Custom TCP Server In Golang?](https://www.youtube.com/watch?v=qJQrrscB1-4)
-- [david hwang | Go Realtime Chat Part 1](https://www.youtube.com/watch?v=W9SuX9c40s8)
-- [ProgrammingPercy | Mastering WebSockets With Go](https://www.youtube.com/watch?v=pKpKv9MKN-E)
+| Author | Title | Links |
+|---|---|---|
+| [Anthony GG](https://www.youtube.com/@anthonygg_) | How To Build A Custom TCP Server In Golang? | [YouTube](https://www.youtube.com/watch?v=qJQrrscB1-4) |
+| [david hwang](https://www.youtube.com/@dhij) | Go Realtime Chat Part 1 | [YouTube](https://www.youtube.com/watch?v=W9SuX9c40s8) |
+| [ProgrammingPercy](https://www.youtube.com/@programmingpercy) | Mastering WebSockets With Go | [YouTube](https://www.youtube.com/watch?v=pKpKv9MKN-E)<br>[Blog Post](https://programmingpercy.tech/blog/mastering-websockets-with-go/) |
