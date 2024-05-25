@@ -1,7 +1,6 @@
 package server
 
 import (
-	"encoding/json"
 	"fmt"
 	"hello-go/common"
 	"net/http"
@@ -53,10 +52,9 @@ func (s *WsServer) Run() error {
 	s.db = common.DbConnect()
 	defer s.db.Close()
 
-	http.HandleFunc("/", s.index)
-	http.HandleFunc("/login", s.auth)
+	http.HandleFunc("GET /login", s.authOTP)
 	http.HandleFunc("/ws", s.serveWS)
-	// TODO: implement REST API
+	s.registerApi()
 
 	// DEBUG: testing client recv
 	go func() {
@@ -89,12 +87,6 @@ func (s *WsServer) Run() error {
 	return http.ListenAndServe(fmt.Sprintf(":%v", s.port), nil)
 }
 
-func (s *WsServer) index(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]string{"status": "online"})
-}
-
 func (s *WsServer) serveWS(w http.ResponseWriter, r *http.Request) {
 	log.Debugf("websocket request from: %v", r.RemoteAddr)
 
@@ -124,7 +116,7 @@ func (s *WsServer) serveWS(w http.ResponseWriter, r *http.Request) {
 	go s.handle(NewPeer(conn))
 }
 
-func (s *WsServer) auth(w http.ResponseWriter, r *http.Request) {
+func (s *WsServer) authOTP(w http.ResponseWriter, r *http.Request) {
 	user, pass, ok := r.BasicAuth()
 	if !ok || !s.db.AuthUser(user, pass) {
 		log.Warnf("REJECT unauthorized user `%s` from %v", user, r.RemoteAddr)
